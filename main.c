@@ -14,64 +14,50 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-char cipherKey[] = " !#$%&'()*+,-./123456789;:<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
-size_t MAX_FILE_SIZE = 5000;
-char buffer[5000];
-char temp[5000];
-char tempReverse[5000];
-char concatStore[5000] = {'\0'};
-
-void stringConcat(char* first, char* second) {
-    size_t len1 = strlen(first);
-    size_t len2 = strlen(second);
-
-    char * s = malloc(len1 + len2 + 2);
-    memcpy(s, first, len1);
-    s[len1] = ' ';
-    memcpy(s + len1 + 1, second, len2 + 1); // includes terminating null
-    memset(first, '\0', sizeof(first));
-    strcpy(first, s);
-    printf("string concat: %s\n", s);
-    free(s);
-}
+char cipherKey[] = "/ !#$%&'()*+,-.0123456789;:<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+char buffer[5000], temp[5000], concatStore[5000], filePath[256];
+int shift;
+long fileSize;
+FILE *fp;
 
 void concatString(char string[]) {
     ((concatStore[0] == '\0')) ? strcpy(concatStore, string) : strcat(concatStore, string);
 }
 
-void readFile() {
+void setFileSize() {
+    fseek(fp, 0, SEEK_END); // seek to end of file
+    fileSize = ftell(fp); // get current file pointer
+    fseek(fp, 0, SEEK_SET); // seek back to beginning of file
+    printf("fileSize: %d\n", fileSize);
+}
+
+void setFilePath() {
     fflush(stdin);
-    char string[MAX_FILE_SIZE];
-	int len, i = 0;
+    int len;
 	printf("\nPlease, input file path: ");
-
     // notice stdin being passed in
-    fgets(string, MAX_FILE_SIZE, stdin);
-    len = strlen(string);
-    if(string[len-1] == '\n') string[len-1] = 0;  //removes \n from end of fgets string
+    fgets(filePath, 256, stdin);
+    len = strlen(filePath);
+    if(filePath[len-1] == '\n') filePath[len-1] = 0;  //removes \n from end of fgets string
+}
 
-    FILE *fp;
-    fp = fopen(string,"r");
-
+void readFile() {
+    int i = 0;
     if(fp) {
-        while (i < (MAX_FILE_SIZE - 1) && (!(feof(fp)))) {
+        while (i < (fileSize - 1) && (!(feof(fp)))) {
              buffer[i] = fgetc(fp);
              i++;
         }
-        //buffer[i] = '\0';  // terminating character
         printf("\nfile contents:\n%s\n", buffer);
-        shiftMenu();
     }
     else {
-        printf("\nerror: %s is not a valid file path\n\n", string);
+        printf("\nerror: %s is not a valid file path\n\n", filePath);
         int select;
         printf("Input 1 to enter valid file.\n");
         printf("Input any other key to exit.\n");
         scanf("%d", &select);
         (select == 1) ? readFile() : exit(1);
     }
-
-    fclose(fp);
 }
 
 void switchChar(char original[], char temp[], int i, int j, int shift) {
@@ -98,11 +84,10 @@ char* switchCharLoop(char original[], char temp[], int i, int j, int shift) {
         switchCharLoop(original, temp, i, j, shift);
     }
     strcpy(cipherOutput, temp);
-    //printf("ciphOut -            : %s\n", cipherOutput);
     return cipherOutput;
 }
 
-void encryptLineByLine(char longString[], char tempStore[], int shift) {
+void cipherByLine(char longString[], char tempStore[], int shift) {
     int oLen = strlen(longString);
     longString[oLen - 1] = 0; //removes crap from end of string
     const char * curLine = longString;
@@ -125,7 +110,6 @@ void encryptLineByLine(char longString[], char tempStore[], int shift) {
 
             memset(newTempStr, 0, sizeof(newTempStr)); //clear buffer
             memset(temp, 0, sizeof(temp)); //clear buffer
-            memset(tempReverse,0, sizeof(tempReverse)); //clear buffer
         }
         else printf("\nerror: malloc() failed\n");
 
@@ -133,8 +117,17 @@ void encryptLineByLine(char longString[], char tempStore[], int shift) {
     }
 }
 
+void cipherAction() {
+    cipherByLine(buffer, temp, shift);  //encrypt
+    printf("\nencrypt:\n%s\n", concatStore);
+    memset(buffer, 0, sizeof(buffer)); //clear buffer
+    strcpy(buffer, concatStore); //strcpy concatStore to buffer
+    memset(concatStore, 0, sizeof(concatStore)); //clear buffer
+    cipherByLine(buffer, temp, (0 - shift));
+    printf("\ndecrypt:\n%s\n", concatStore);
+}
+
 void shiftMenu() {
-    int shift;
     printf("\ninput a shift value: \n(note: the shift value must be between 1 and 90)\n");
     scanf("%d", &shift);
 
@@ -147,19 +140,16 @@ void shiftMenu() {
         (select == 1) ? shiftMenu() : exit(1);
         shiftMenu();
     }
-    printf("\nencrypt:\n");
-    encryptLineByLine(buffer, temp, shift);  //encrypt
-    printf("**concat:\n%s\n", concatStore);
-    memset(buffer, 0, sizeof(buffer)); //clear buffer
-    strcpy(buffer, concatStore); //strcpy concatStore to buffer
-    memset(concatStore, 0, sizeof(concatStore)); //clear buffer
-    printf("\ndecrypt:\n");
-    encryptLineByLine(buffer, temp, (0 - shift));
-    printf("**concat:\n%s\n", concatStore);
 }
 
 int main() {
+    setFilePath();
+    fp = fopen(filePath, "r");
+    setFileSize();
     readFile();
+    fclose(fp);
+    shiftMenu();
+    cipherAction();
 
     return 0;
 }
